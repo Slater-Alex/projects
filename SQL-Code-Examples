@@ -1,0 +1,33 @@
+
+Mode SQL Data Analytics selected code
+
+SELECT *
+FROM (
+      SELECT 
+      rank() OVER (PARTITION BY start_terminal
+                          ORDER BY duration_seconds DESC) AS rank,
+      start_terminal,
+      duration_seconds,
+      start_time
+      FROM tutorial.dc_bikeshare_q1_2012
+      ) sub
+WHERE sub.rank <=5
+
+#example showing window functions and subquerying
+#Code returns the 5 longest rides from each terminal, ordered by terminal and longest rides first
+
+SELECT incidents.*,
+       sub.category AS category
+  FROM tutorial.sf_crime_incidents_2014_01 incidents
+  JOIN ( SELECT category,
+          COUNT(incidnt_num) AS incidents
+           FROM tutorial.sf_crime_incidents_2014_01
+          GROUP BY 1
+          ORDER BY 2
+          LIMIT 3
+       ) sub
+    ON incidents.category = sub.category
+ ORDER BY sub.category
+
+#example showing advanced aggregation and subqueries. 
+#Code returns records from the 3 least commonly occuring types of crimes in SF database
