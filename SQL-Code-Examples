@@ -14,7 +14,8 @@ FROM (
 WHERE sub.rank <=5
 
 #example showing window functions and subquerying
-#Code returns the 5 longest rides from each terminal, ordered by terminal and longest rides first;
+#Code returns the 5 longest rides from each terminal, ordered by terminal and longest rides first
+;
 
 
 SELECT incidents.*,
@@ -31,8 +32,8 @@ SELECT incidents.*,
  ORDER BY sub.category
 
 #example showing advanced aggregation and subqueries. 
-#Code returns records from the 3 least commonly occuring types of crimes in SF database;
-
+#Code returns records from the 3 least commonly occuring types of crimes in SF database
+;
 
 SELECT DATE_TRUNC('WEEK', e.occurred_at) AS week,
        COUNT(CASE WHEN e.action = 'sent_weekly_digest' THEN e.user_id ELSE NULL END) AS sent_digest,
@@ -43,4 +44,5 @@ FROM tutorial.yammer_emails e
 GROUP BY 1
 ORDER BY 1
 
-#example showing aggregation by group and some date manipulation;
+#example showing aggregation by group and some date manipulation
+;
