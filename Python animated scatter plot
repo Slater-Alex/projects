@@ -1,0 +1,10 @@
+https://imgur.com/a/J67R0Vg
+
+Visit the imgur link above or run the python code below in your own environment to see what the chart looks like! Thanks to plotly for the dataset and documentation
+
+import plotly.express as px
+df = px.data.gapminder()
+px.scatter(df, x="gdpPercap", y="lifeExp", animation_frame="year", animation_group="country",
+           size="pop", color="continent", hover_name="country",
+           log_x=True, size_max=75, range_x=[100,100000], range_y=[25,90])
+#Thanks to plotly for dataset and documentation
