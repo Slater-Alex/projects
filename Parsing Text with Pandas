@@ -1,0 +1,98 @@
+# list to store file lines
+lines = []
+# read file
+with open(r"C:\\Alex\\ExampleText.txt", 'r') as fp:
+    # read an store all lines into list
+    lines = fp.readlines()
+
+# Write file
+with open(r"C:\\Alex\\ExampleText.txt", 'w') as fp:
+    
+    # iterate each line
+    for number, line in enumerate(lines):
+        # delete line 5 and 8. or pass any Nth line you want to remove
+        # note list index starts from 0
+       
+            fp.write(line)
+
+a_file = open("C:\\Alex\\ExampleText.txt", "r")
+
+list_of_lists = []
+for line in a_file:
+  stripped_line = line.strip()
+  line_list = stripped_line.split()
+  list_of_lists.append(line_list)
+
+a_file.close()
+
+#l as Row list
+l = []
+#second as Column list
+second = []
+
+# Append index of l,second iterating through list of lists
+for i, item in enumerate(list_of_lists):
+    if '3551' in item:
+        l.append(i)
+        second.append(item.index('3551'))      
+        
+# Function to merge first and second indexes
+def merge(list1, list2):
+      
+    merged_list = list(zip(list1, list2)) 
+    return merged_list
+
+# Merge
+searchlist = merge(l,second)
+
+# Filter on value you want by index
+searchlist = list(filter(lambda x: x[1] == 1, searchlist))
+
+# Transform to get only first value of each index pair
+res = list(zip(*searchlist))
+res.append(0)
+indexer = list(res[0])
+
+# Get list of indexes + 1 to append 2nd row which contains rate info
+listchecker = [x+1 for x in indexer]
+
+#trim input list based on index of rows we want
+trimmedlist = [x for ind, x in enumerate(list_of_lists) if ind in indexer]
+
+trimmedlistplus1 = [x for ind, x in enumerate(list_of_lists) if ind in listchecker]
+
+# For each index in length of trimmed list, concat the next row
+final = []
+for i in range(len(trimmedlist)):
+    final.append((trimmedlist[i]+trimmedlistplus1[i]))
+
+# Searchlist for elements which contain extraneous information    
+N = ['*','S/P:','D','SR', 'JR']
+
+# Iterate and remove elements which are in list N above
+finalres1 = [[ele for ele in sub if ele not in N] for sub in final]
+
+# Import pandas for DF operations
+import pandas as pd
+
+# Give column names to df finalres1
+df = pd.DataFrame (finalres1, columns = (['Account Number','Cost Center', 'First Name', 'Middle Initial','Last Name','Zero Column','1M','Dealership Number','610','Date','2nd Date','Originated Amount','Outstanding Balance','Dealership Number','Rate','Interest/Rate','Extra','Extra2']))
+
+# Filter to shift specific columns based on filtercond
+filtercond = ['00', '01', '1M']
+m = df['Last Name'].isin(filtercond)
+df.loc[m, 'Last Name':] = df.loc[m, 'Last Name':].shift(axis=1)
+
+# Repeat to shift correct columns / rows
+m = df['Interest/Rate'].isna()
+df.loc[m, 'Outstanding Balance':] = df.loc[m, 'Outstanding Balance':].shift(axis=1)
+
+# And again
+filtercond2 = ['00','01']
+m = ~df['Zero Column'].isin(filtercond2)
+df.loc[m, 'Last Name':] = df.loc[m, 'Last Name':].shift(-1,axis=1)
+
+# Output df to CSV
+df.to_csv('IndirectLASRows')
+
+
