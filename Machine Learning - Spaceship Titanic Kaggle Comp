@@ -1,0 +1,224 @@
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import seaborn as sns
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+/kaggle/input/spaceship-titanic/sample_submission.csv
+/kaggle/input/spaceship-titanic/train.csv
+/kaggle/input/spaceship-titanic/test.csv
+df = pd.read_csv('../input/spaceship-titanic/train.csv',index_col='PassengerId')
+#Things that might lead to transport:
+
+# Cuts of PassengerId, Cabin, Sum(MoneySpent), Name
+df.head()
+HomePlanet	CryoSleep	Cabin	Destination	Age	VIP	RoomService	FoodCourt	ShoppingMall	Spa	VRDeck	Name	Transported
+PassengerId													
+0001_01	Europa	False	B/0/P	TRAPPIST-1e	39.0	False	0.0	0.0	0.0	0.0	0.0	Maham Ofracculy	False
+0002_01	Earth	False	F/0/S	TRAPPIST-1e	24.0	False	109.0	9.0	25.0	549.0	44.0	Juanna Vines	True
+0003_01	Europa	False	A/0/S	TRAPPIST-1e	58.0	True	43.0	3576.0	0.0	6715.0	49.0	Altark Susent	False
+0003_02	Europa	False	A/0/S	TRAPPIST-1e	33.0	False	0.0	1283.0	371.0	3329.0	193.0	Solam Susent	False
+0004_01	Earth	False	F/1/S	TRAPPIST-1e	16.0	False	303.0	70.0	151.0	565.0	2.0	Willy Santantines	True
+#Cabin code variables
+#TotalSpend
+Spend = df[['RoomService','FoodCourt','ShoppingMall','Spa','VRDeck']].sum(axis=1)
+df['Spend']=df[['RoomService','FoodCourt','ShoppingMall','Spa','VRDeck']].sum(axis=1)
+df['cab1']=df['Cabin'].str.slice(stop=1)
+df['cab3']=df['Cabin'].str.slice(start=-1)
+
+numerical_cols = [cname for cname in df.columns if 
+                df[cname].dtype in ['int64', 'float64', 'uint8']]
+categorical_cols = [cname for cname in df.columns if
+                    df[cname].dtype == "object"]
+
+df.isnull().sum()
+HomePlanet      201
+CryoSleep       217
+Cabin           199
+Destination     182
+Age             179
+VIP             203
+RoomService     181
+FoodCourt       183
+ShoppingMall    208
+Spa             183
+VRDeck          188
+Name            200
+Transported       0
+Spend             0
+cab1            199
+cab3            199
+dtype: int64
+print(numerical_cols)
+print(categorical_cols)
+['Age', 'RoomService', 'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck', 'Spend']
+['HomePlanet', 'CryoSleep', 'Cabin', 'Destination', 'VIP', 'Name', 'cab1', 'cab3']
+df.hist()
+#suggests we should fill NAs with Mean or 0 for everything except age
+array([[<AxesSubplot:title={'center':'Age'}>,
+        <AxesSubplot:title={'center':'RoomService'}>,
+        <AxesSubplot:title={'center':'FoodCourt'}>],
+       [<AxesSubplot:title={'center':'ShoppingMall'}>,
+        <AxesSubplot:title={'center':'Spa'}>,
+        <AxesSubplot:title={'center':'VRDeck'}>],
+       [<AxesSubplot:title={'center':'Spend'}>, <AxesSubplot:>,
+        <AxesSubplot:>]], dtype=object)
+
+cat_predictors = df[['HomePlanet','CryoSleep','Destination','VIP','cab1','cab3']]
+
+for col in cat_predictors:
+    plt.figure()
+    sns.countplot(x=cat_predictors[col], data=cat_predictors)
+#now have values to impute into any missing spot
+
+
+df.corr()
+#Europa, CryoSleep, class(c,b), likely to get transported
+#need dummies for Europa, Class
+Age	RoomService	FoodCourt	ShoppingMall	Spa	VRDeck	Transported	Spend
+Age	1.000000	0.068723	0.130421	0.033133	0.123970	0.101007	-0.075026	0.186530
+RoomService	0.068723	1.000000	-0.015889	0.054480	0.010080	-0.019581	-0.244611	0.237998
+FoodCourt	0.130421	-0.015889	1.000000	-0.014228	0.221891	0.227995	0.046566	0.745105
+ShoppingMall	0.033133	0.054480	-0.014228	1.000000	0.013879	-0.007322	0.010141	0.222310
+Spa	0.123970	0.010080	0.221891	0.013879	1.000000	0.153821	-0.221131	0.596633
+VRDeck	0.101007	-0.019581	0.227995	-0.007322	0.153821	1.000000	-0.207075	0.586299
+Transported	-0.075026	-0.244611	0.046566	0.010141	-0.221131	-0.207075	1.000000	-0.199514
+Spend	0.186530	0.237998	0.745105	0.222310	0.596633	0.586299	-0.199514	1.000000
+X_full = df
+X_full_test = pd.read_csv('../input/spaceship-titanic/test.csv', index_col='PassengerId')
+
+#Cabin code variables
+#TotalSpend
+
+X_full_test['Spend']=X_full_test[['RoomService','FoodCourt','ShoppingMall','Spa','VRDeck']].sum(axis=1)
+X_full_test['cab1']=X_full_test['Cabin'].str.slice(stop=1)
+X_full_test['cab3']=X_full_test['Cabin'].str.slice(start=-1)
+y = X_full.Transported
+#X_full.drop(['Transported'], axis=1, inplace=True)
+X_full = pd.get_dummies(X_full, columns = ['HomePlanet','cab1','cab3'])
+X_full_test = pd.get_dummies(X_full_test, columns = ['HomePlanet','cab1','cab3'])
+
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+X_full.CryoSleep = X_full.CryoSleep.replace({True: 1, False: 0})
+X_full.columns
+Index(['CryoSleep', 'Cabin', 'Destination', 'Age', 'VIP', 'RoomService',
+       'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck', 'Name', 'Transported',
+       'Spend', 'HomePlanet_Earth', 'HomePlanet_Europa', 'HomePlanet_Mars',
+       'cab1_A', 'cab1_B', 'cab1_C', 'cab1_D', 'cab1_E', 'cab1_F', 'cab1_G',
+       'cab1_T', 'cab3_P', 'cab3_S'],
+      dtype='object')
+features = ['CryoSleep', 'Age', 'RoomService',
+       'FoodCourt', 'ShoppingMall', 'Spa', 'VRDeck', 'Spend', 'cab3_P', 'cab3_S',
+       'HomePlanet_Earth', 'HomePlanet_Europa', 'HomePlanet_Mars', 'cab1_A',
+       'cab1_B', 'cab1_C', 'cab1_D', 'cab1_E', 'cab1_F', 'cab1_G', 'cab1_T']
+
+X_full = X_full[features]
+X_full_test = X_full_test[features]
+
+X_train, X_valid, y_train, y_valid = train_test_split(X_full, y, train_size=0.80, test_size=0.20,
+                                                      random_state=150)
+
+
+categorical_cols = [cname for cname in X_train.columns if
+                    X_train[cname].dtype == "object"]
+
+# Select numerical columns
+numerical_cols = [cname for cname in X_train.columns if 
+                X_train[cname].dtype in ['int64', 'float64', 'uint8']]
+
+
+# Keep selected columns only
+my_cols = categorical_cols + numerical_cols
+X_train = X_train[my_cols].copy()
+X_valid = X_valid[my_cols].copy()
+X_test = X_full_test[my_cols].copy()
+
+
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+# Preprocessing for numerical data
+numerical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(missing_values = np.nan, strategy='mean'))
+])
+
+
+# Preprocessing for categorical data
+categorical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(missing_values = np.nan , strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
+
+# Bundle preprocessing for numerical and categorical data
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numerical_transformer, numerical_cols),
+        ('cat', categorical_transformer, categorical_cols)
+    ])
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn import metrics
+
+model = RandomForestClassifier(n_estimators=100, random_state=0)
+# Bundle preprocessing and modeling code in a pipeline
+my_pipeline = Pipeline(steps=[('preprocessor', preprocessor)
+                              ,('model', model)
+                             ])
+
+# # Preprocessing of training data, fit model 
+my_pipeline.fit(X_train, y_train)
+
+# Preprocessing of validation data, get predictions
+preds = my_pipeline.predict(X_test)
+
+
+
+
+output = pd.DataFrame({'PassengerId': X_test.index,
+                       'Transported': preds})
+
+print(output)
+
+output.to_csv('submission.csv', index=False)
+     PassengerId  Transported
+0        0013_01         True
+1        0018_01        False
+2        0019_01         True
+3        0021_01         True
+4        0023_01         True
+...          ...          ...
+4272     9266_02         True
+4273     9269_01        False
+4274     9271_01         True
+4275     9273_01         True
+4276     9277_01        False
+
+[4277 rows x 2 columns]
+ 
