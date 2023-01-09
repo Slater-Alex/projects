@@ -1,0 +1,223 @@
+# This Python 3 environment comes with many helpful analytics libraries installed
+# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
+# For example, here's several helpful packages to load
+
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
+# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
+
+#Big thank you to Kaggle User Umerkk12 for much of the inspiration for this workbook
+
+import math
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from termcolor import colored
+
+import warnings
+warnings.filterwarnings("ignore")
+
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import RandomizedSearchCV, KFold,GridSearchCV
+from sklearn.metrics import r2_score,mean_absolute_error,mean_squared_error
+
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import GradientBoostingRegressor,StackingRegressor, RandomForestRegressor, ExtraTreesRegressor
+from sklearn.linear_model import Lasso
+from sklearn.pipeline import make_pipeline
+
+from scipy.stats import skew
+from scipy.special import boxcox1p
+from scipy.stats import boxcox_normmax
+from scipy.stats import boxcox
+from scipy.special import inv_boxcox
+
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, StandardScaler
+import lightgbm as lgb
+import xgboost as xgb
+
+app = pd.read_csv('../input/credit-card-approval-prediction/application_record.csv')
+portfolio = pd.read_csv('../input/credit-card-approval-prediction/credit_record.csv')
+
+#deal with app info first
+app.head()
+
+%matplotlib inline
+app.hist(bins=50, figsize=(20,20))
+plt.show()
+
+app['ID'].nunique()
+
+portfolio['ID'].nunique() 
+
+len(set(portfolio['ID']).intersection(set(app['ID'])))
+
+app = app.drop_duplicates('ID', keep='last') 
+
+sns.heatmap(app.isnull()) 
+
+sns.heatmap(portfolio.isnull())
+
+# Imputated most common occupation type. Crude, but can imagine OccupationType being predictive.
+
+app = app.fillna(app.mode().iloc[0])
+
+sns.heatmap(app.isnull()) 
+
+
+app.columns
+
+#dont want to pick up dummies
+#num_feats = list(app.select_dtypes(include='number'))
+num_feats = [ 'DAYS_EMPLOYED', 'DAYS_BIRTH','AMT_INCOME_TOTAL']
+categ_feats = list(app.select_dtypes(exclude='number'))
+
+LABELS = app.drop('ID',axis=1).columns
+encoder = LabelEncoder()
+for col in LABELS:
+    # Check if object
+    if app[col].dtype == 'O':
+        app[col] = encoder.fit_transform(app[col])
+        
+    elif app[col].dtype == 'bool':
+        app[col] = app[col].astype('int')
+
+ss_scaler = StandardScaler()
+
+# Apply Standard Scaling
+app[num_feats] = ss_scaler.fit_transform(app[num_feats])
+
+app.tail(20)
+
+
+fig, ax= plt.subplots(nrows= 3, ncols = 3, figsize= (14,6))
+
+sns.scatterplot(x='ID', y='CNT_CHILDREN', data=app, ax=ax[0][0], color= 'orange')
+sns.scatterplot(x='ID', y='AMT_INCOME_TOTAL', data=app, ax=ax[0][1], color='orange')
+sns.scatterplot(x='ID', y='DAYS_BIRTH', data=app, ax=ax[0][2])
+sns.scatterplot(x='ID', y='DAYS_EMPLOYED', data=app, ax=ax[1][0])
+sns.scatterplot(x='ID', y='FLAG_MOBIL', data=app, ax=ax[1][1])
+sns.scatterplot(x='ID', y='FLAG_WORK_PHONE', data=app, ax=ax[1][2])
+sns.scatterplot(x='ID', y='FLAG_PHONE', data=app, ax=ax[2][0])
+sns.scatterplot(x='ID', y='FLAG_EMAIL', data=app, ax=ax[2][1])
+sns.scatterplot(x='ID', y='CNT_FAM_MEMBERS', data=app, ax=ax[2][2], color= 'orange')
+
+
+q_hi = app['CNT_CHILDREN'].quantile(0.999)
+q_low = app['CNT_CHILDREN'].quantile(0.001)
+app = app[(app['CNT_CHILDREN']>q_low) & (app['CNT_CHILDREN']<q_hi)]
+
+q_hi = app['AMT_INCOME_TOTAL'].quantile(0.999)
+q_low = app['AMT_INCOME_TOTAL'].quantile(0.001)
+app = app[(app['AMT_INCOME_TOTAL']>q_low) & (app['AMT_INCOME_TOTAL']<q_hi)]
+
+#FOR CNT_FAM_MEMBERS COLUMN
+q_hi = app['CNT_FAM_MEMBERS'].quantile(0.999)
+q_low = app['CNT_FAM_MEMBERS'].quantile(0.001)
+app= app[(app['CNT_FAM_MEMBERS']>q_low) & (app['CNT_FAM_MEMBERS']<q_hi)]
+
+fig, ax= plt.subplots(nrows= 3, ncols = 3, figsize= (14,6))
+
+sns.scatterplot(x='ID', y='CNT_CHILDREN', data=app, ax=ax[0][0], color= 'orange')
+sns.scatterplot(x='ID', y='AMT_INCOME_TOTAL', data=app, ax=ax[0][1], color='orange')
+sns.scatterplot(x='ID', y='DAYS_BIRTH', data=app, ax=ax[0][2])
+sns.scatterplot(x='ID', y='DAYS_EMPLOYED', data=app, ax=ax[1][0])
+sns.scatterplot(x='ID', y='FLAG_MOBIL', data=app, ax=ax[1][1])
+sns.scatterplot(x='ID', y='FLAG_WORK_PHONE', data=app, ax=ax[1][2])
+sns.scatterplot(x='ID', y='FLAG_PHONE', data=app, ax=ax[2][0])
+sns.scatterplot(x='ID', y='FLAG_EMAIL', data=app, ax=ax[2][1])
+sns.scatterplot(x='ID', y='CNT_FAM_MEMBERS', data=app, ax=ax[2][2], color= 'orange')
+
+portfolio.head()
+portfolio['STATUS'].replace({'C': 0, 'X': 0}, inplace=True)
+portfolio['STATUS'] = portfolio['STATUS'].astype('int')
+portfolio['STATUS'] = [1 if x >= 2 else 0 for x in portfolio['STATUS']]
+
+portfolio['STATUS'].value_counts(normalize=True)
+#As given in the problem defintion, data is unbalanced
+#Will apply SMOTE method to generate samples for delinquent/chargeoff case
+
+groupedportfolio = portfolio.groupby('ID').agg(max).reset_index()
+groupedportfolio.info()
+
+df = app.join(groupedportfolio.set_index('ID'), on='ID', how='inner')
+df.info()
+
+X = df.iloc[:,1:-1]
+y = df.iloc[:,-1]
+
+from sklearn.preprocessing import MinMaxScaler
+mms = MinMaxScaler()
+X_scaled = pd.DataFrame(mms.fit_transform(X_train), columns=X_train.columns)
+X_test_scaled = pd.DataFrame(mms.transform(X_test), columns=X_test.columns)
+# we have now fit and transform the data into a scaler for accurate reading and results.
+
+from imblearn.over_sampling import SMOTE
+oversample = SMOTE()
+X_balanced, y_balanced = oversample.fit_resample(X_scaled, y_train)
+X_test_balanced, y_test_balanced = oversample.fit_resample(X_test_scaled, y_test)
+# we have addressed the issue of oversampling here
+
+#Though y_test_balanced was generated, will be predicting using y_test to protect against data leakage
+
+y_train.value_counts()
+
+y_balanced.value_counts()
+
+y_test.value_counts()
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
+
+classifiers = {
+    "LogisticRegression" : LogisticRegression(),
+    "KNeighbors" : KNeighborsClassifier(),
+    "SVC" : SVC(),
+    "DecisionTree" : DecisionTreeClassifier(),
+    "RandomForest" : RandomForestClassifier(),
+    "XGBoost" : XGBClassifier()
+}
+
+
+train_scores = []
+test_scores = []
+
+for key, classifier in classifiers.items():
+    classifier.fit(X_balanced, y_balanced)
+    train_score = classifier.score(X_balanced, y_balanced)
+    train_scores.append(train_score)
+    test_score = classifier.score(X_test, y_test)
+    test_scores.append(test_score)
+
+print(train_scores)
+print(test_scores)
+
+
+xgb = XGBClassifier()
+model = xgb.fit(X_balanced, y_balanced)
+prediction = xgb.predict(X_test)
+
+
+from sklearn.metrics import classification_report
+print(classification_report(y_test, prediction))
+
+#While XGB scored the best, for the purposes of
+#risk management, might not be sufficient as is challenging to
+#interpret. A logistic regression might score worse, but 
+#being able to provide reasonable descriptions for the prediction
+#might be a worthwhile tradeoff in view of OCC requirements.
